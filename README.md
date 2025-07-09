@@ -1,18 +1,3 @@
-<p align="center">
-<img src="https://github.com/wkaisertexas/tiktok-uploader/assets/27795014/f991fdc7-287a-4c3b-9a84-22c7ad8a57bf" alt="video working" />
-</p>
-
-<h1 align="center"> ⬆️ TikTok Uploader </h1>
-<p align="center">A <strong>Selenium</strong>-based automated <strong>TikTok</strong> video uploader</p>
-
-<p align="center">
-  <img alt="Forks" src="https://img.shields.io/github/forks/wkaisertexas/tiktok-uploader" />
-  <img alt="Stars" src="https://img.shields.io/github/stars/wkaisertexas/tiktok-uploader" />
-  <img alt="Watchers" src="https://img.shields.io/github/watchers/wkaisertexas/tiktok-uploader" />
-</p>
-
-<h1>Table of Contents</h1>
-
 - [Installation](#installation)
   - [MacOS, Windows and Linux](#macos-windows-and-linux)
     - [Downloading from PyPI (Recommended)](#pypi)
@@ -172,8 +157,8 @@ You can automatically add a product link to your uploaded video.
 
 **Prerequisites:**
 
-*   Your TikTok account must be eligible to add showcase products to your videos.
-*   You need to obtain the product ID beforehand. To do this:
+- Your TikTok account must be eligible to add showcase products to your videos.
+- You need to obtain the product ID beforehand. To do this:
     1. Go to the TikTok upload page in your browser.
     2. Click the "Add link" button and select "Product".
     3. A modal will appear showing your available showcase products along with their IDs.
@@ -293,7 +278,6 @@ options.add_argument('start-maximized')
 
 upload_videos(..., options=options)
 ```
-
 
 > [!NOTE]
 > Make sure to use the right selenium options for your browser
