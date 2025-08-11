@@ -9,11 +9,10 @@ from typing import Optional, List
 from faststream.rabbit import RabbitBroker
 
 from src.loader import config
-from src.tiktokautouploader.function import upload_tiktok, login_with_qr_and_save_cookies
+from src.tiktokautouploader.function import upload_tiktok
 
 
 class TikTokUploadMessage(BaseModel):
-    tg_user_id: int = Field(..., description="ID пользователя в Telegram для обратной связи.")
     s3_video_key: str = Field(..., description="Ключ (путь) к видеофайлу в S3 бакете.")
     account_name: str = Field(..., description="Имя аккаунта для загрузки видео.")
     description: str = Field(..., description="Описание для видео.")
@@ -22,23 +21,6 @@ class TikTokUploadMessage(BaseModel):
     proxy: Optional[dict] = Field(default=None, description="Словарь с данными для прокси: {'host', 'port', 'user', 'pass'}")
     # headless: bool = Field(default=True, description="Run browser in headless mode.")
     # stealth: bool = Field(default=True, description="Use stealth mode to mimic human behavior.")
-
-
-class TikTokLoginMessage(BaseModel):
-    tg_user_id: int = Field(..., description="ID пользователя в Telegram.")
-    account_name: str = Field(..., description="Имя аккаунта TikTok для входа.")
-    proxy: Optional[dict] = Field(default=None, description="Данные прокси.")
-
-
-class QRCodeMessage(BaseModel):
-    tg_user_id: int = Field(..., description="ID пользователя в Telegram для отправки QR-кода.")
-    qr_code_data: str = Field(..., description="Данные QR-кода (например, base64-строка или URL).")
-
-
-class LoginStatusMessage(BaseModel):
-    tg_user_id: int = Field(..., description="ID пользователя в Telegram.")
-    success: bool = Field(..., description="Статус входа: True, если успешно.")
-    message: str = Field(..., description="Сообщение для пользователя.")
 
 
 broker = RabbitBroker(config.rabbitmq.url)
@@ -83,12 +65,6 @@ async def handle_tiktok_upload(msg: TikTokUploadMessage):
     logger.debug("Start polling for new task")
     logger.info(f"Received new task for account: {msg.account_name}, s3_key: {msg.s3_video_key}")
 
-    async def send_qr_code(qr_data: str):
-        """Callback to send QR code data to RabbitMQ."""
-        logger.info(f"Sending QR code to user {msg.tg_user_id}")
-        qr_message = QRCodeMessage(tg_user_id=msg.tg_user_id, qr_code_data=qr_data)
-        await broker.publish(qr_message, queue="qr_codes")
-
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_video:
         local_video_path = temp_video.name
         logger.info(f"Created temporary file for video: {local_video_path}")
@@ -110,11 +86,11 @@ async def handle_tiktok_upload(msg: TikTokUploadMessage):
             
             logger.debug(f"Formatted proxy: {formatted_proxy}")
             
-            await upload_tiktok(
+            await asyncio.to_thread(
+                upload_tiktok,
                 video=local_video_path,
                 description=msg.description,
                 accountname=msg.account_name,
-                qr_callback=send_qr_code,
                 hashtags=msg.hashtags,
                 sound_name=msg.sound_name,
                 proxy=formatted_proxy,
@@ -135,42 +111,3 @@ async def run_worker():
     logger.info("Starting worker...")
     await broker.start()
     await asyncio.Future() 
-
-
-@broker.subscriber("login_tasks")
-async def handle_tiktok_login(msg: TikTokLoginMessage):
-    """Handles a message to initiate TikTok login via QR code."""
-    logger.info(f"Received login task for account: {msg.account_name}")
-
-    async def send_qr_code(qr_data: str):
-        logger.info(f"Sending QR code to user {msg.tg_user_id}")
-        qr_message = QRCodeMessage(tg_user_id=msg.tg_user_id, qr_code_data=qr_data)
-        await broker.publish(qr_message, queue="qr_codes_login")
-
-    try:
-        formatted_proxy = format_proxy(msg.proxy)
-        login_success, message = await login_with_qr_and_save_cookies(
-            accountname=msg.account_name,
-            proxy=formatted_proxy,
-            qr_callback=send_qr_code
-        )
-        status_message = LoginStatusMessage(
-            tg_user_id=msg.tg_user_id,
-            success=login_success,
-            message=message
-        )
-        await broker.publish(status_message, queue="login_status")
-
-        if login_success:
-            logger.success(f"Successfully logged in for account: {msg.account_name}")
-        else:
-            logger.error(f"Failed to log in for account: {msg.account_name}: {message}")
-
-    except Exception as e:
-        logger.exception(f"An error occurred during login for {msg.account_name}: {e}")
-        error_status = LoginStatusMessage(
-            tg_user_id=msg.tg_user_id,
-            success=False,
-            message=f"Произошла критическая ошибка в воркере: {e}"
-        )
-        await broker.publish(error_status, queue="login_status") 
