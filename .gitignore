@@ -145,3 +145,5 @@ TikTokUploader/examples
 
 # Node.js dependencies
 src/tiktokautouploader/Js_assets/node_modules/
+
+*.json

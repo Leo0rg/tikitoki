@@ -9,7 +9,8 @@
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "fingerprint-injector": "^2.1.41",
-    "fingerprint-generator": "^2.1.41"
+    "fingerprint-generator": "^2.1.41",
+    "node-fetch": "^2.6.7"
   }
 }
 
