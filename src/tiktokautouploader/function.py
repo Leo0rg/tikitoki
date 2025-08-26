@@ -6,6 +6,7 @@ import sys
 import time
 import warnings
 
+import difflib
 import pkg_resources
 import requests
 from inference_sdk import InferenceHTTPClient
@@ -342,6 +343,7 @@ def upload_tiktok(
     tiktok_password=None,
     hashtags=None,
     sound_name=None,
+    favorite_sound_name=None,
     sound_aud_vol="mix",
     schedule=None,
     day=None,
@@ -359,6 +361,7 @@ def upload_tiktok(
     accountname (str) -> account to upload on
     hashtags (str)(array)(opt) -> hashtags for video
     sound_name (str)(opt) -> name of tik tok sound to use for video
+    favorite_sound_name (str)(opt) -> name of favorite sound (from "Favorites" tab) to use for video; best-match search by titles
     sound_aud_vol (str)(opt) -> volume of tik tok sound, 'main', 'mix' or 'background', check documentation for more info -> https://github.com/haziq-exe/TikTokAutoUploader
     schedule (str)(opt) -> format HH:MM, your local time to upload video
     day (int)(opt) -> day to schedule video for, check documentation for more info -> https://github.com/haziq-exe/TikTokAutoUploader
@@ -442,8 +445,9 @@ def upload_tiktok(
         while retries < 2:
             try:
                 page.goto(url, timeout=30000)
-            except:
+            except Exception as e:
                 retries += 1
+                logger.warning(f"Failed to load TikTok upload page (Attempt {retries}): {e}")
                 time.sleep(5)
                 if retries == 2:
                     sys.exit("ERROR: TIK TOK PAGE FAILED TO LOAD, try again.")
@@ -464,8 +468,7 @@ def upload_tiktok(
                 else:
                     time.sleep(0.1)
 
-        if captcha:
-            logger.debug("Captcha solver not ready yet:(")
+        if captcha: 
         #     image = get_image_src(page)
         #     if image:
         #         if suppressprint == False:
@@ -522,12 +525,13 @@ def upload_tiktok(
 
         #         if not solved:
         #             sys.exit("FAILED TO SOLVE CAPTCHA AFTER MULTIPLE ATTEMPTS")
+            logger.debug("Captcha solver not ready yet:(")
 
-        # try:
-        #     page.set_input_files('input[type="file"][accept="video/*"]', f'{video}')
-        # except:
-        #     sys.exit("ERROR: FAILED TO INPUT FILE. Possible Issues: Wifi too slow, file directory wrong, or check documentation to see if captcha is solvable")
-        # page.wait_for_selector('div[data-contents="true"]')
+        try:
+            page.set_input_files('input[type="file"][accept="video/*"]', f'{video}')
+        except:
+            sys.exit("ERROR: FAILED TO INPUT FILE. Possible Issues: Wifi too slow, file directory wrong, or check documentation to see if captcha is solvable")
+        page.wait_for_selector('div[data-contents="true"]')
 
         try:
             if not suppressprint:
@@ -717,31 +721,179 @@ def upload_tiktok(
             except:
                 sys.exit("SCHEDULING ERROR: VIDEO SAVED AS DRAFT")
 
+        try:
+            for banner_sel in [
+                "tiktok-cookie-banner",
+                ".tiktok-cookie-banner",
+                ".paas_tiktok",
+            ]:
+                try:
+                    banner = page.locator(banner_sel).first
+                    if banner.is_visible(timeout=500):
+                        for btn_text in [
+                            "Allow all",
+                            "Accept all",
+                            "Разрешить все",
+                            "Принять все",
+                        ]:
+                            try:
+                                banner.get_by_role("button", name=btn_text, exact=False).click(timeout=1000)
+                                break
+                            except Exception:
+                                try:
+                                    banner.locator(f"button:has-text('{btn_text}')").click(timeout=1000)
+                                    break
+                                except Exception:
+                                    continue
+                        break
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
         sound_fail = False
-        if sound_name != None:
+        if favorite_sound_name is not None:
+            logger.info(f"Attempting to set favorite sound: {favorite_sound_name}")
             try:
-                if stealth == True:
+                if stealth:
                     time.sleep(2)
                 page.click("div.TUXButton-label:has-text('Edit video')")
-            except:
+                logger.debug("Clicked Edit video button successfully")
+            except Exception:
+                logger.debug("Edit video button not found for favorites flow")
+                # Continue; if we cannot open editor, we cannot set sound
+            try:
+                # Try to switch to Favorites tab; attempt multiple selectors/localizations
+                switched = False
+                logger.debug("Attempting to switch to Favorites tab")
+                for sel in [
+                    "[role='tab']:has-text('Favorites')",
+                    "button:has-text('Favorites')",
+                    "div:has-text('Favorites')",
+                    "[role='tab']:has-text('Избранное')",
+                    "button:has-text('Избранное')",
+                    "div:has-text('Избранное')",
+                ]:
+                    try:
+                        page.locator(sel).first.click(timeout=1500)
+                        switched = True
+                        logger.debug(f"Successfully switched to Favorites tab using selector: {sel}")
+                        break
+                    except Exception:
+                        logger.debug(f"Failed to switch using selector: {sel}")
+                        continue
+                if not switched:
+                    logger.debug("Favorites tab not found; skipping favorites selection")
+                    raise Exception("Favorites tab not available")
+
+                logger.debug("Waiting for favorites list to load")
+                try:
+                    page.wait_for_selector('.collection-music-list .list-wrapper .list-container', timeout=4000)
+                    logger.debug("Found deep container selector for favorites")
+                except Exception:
+                    logger.debug("Falling back to music-card-container selector")
+                    page.wait_for_selector('.music-card-container', timeout=6000)
+
+                titles = [t.strip() for t in page.locator('.music-card-title').all_text_contents()]
+                if not titles:
+                    logger.warning("Favorites list appears empty")
+                    raise Exception("Favorites list appears empty")
+
+                target = favorite_sound_name.strip()
+                scores = [difflib.SequenceMatcher(None, t.lower(), target.lower()).ratio() for t in titles]
+                best_idx, best_score = max(enumerate(scores), key=lambda x: x[1])
+                logger.info(f"Found best matching favorite: '{titles[best_idx]}' (score={best_score:.2f}) for target '{target}'")
+
+                page.locator('.music-card-container').nth(best_idx).click()
+                logger.debug("Clicked best matching favorite sound")
+                page.wait_for_selector("div.TUXButton-label:has-text('Use')")
+                if stealth:
+                    time.sleep(1)
+                page.click("div.TUXButton-label:has-text('Use')")
+                try:
+                    page.wait_for_selector(
+                        'img[src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjEiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMSAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTAgNy41MDE2QzAgNi42NzMxNyAwLjY3MTU3MyA2LjAwMTYgMS41IDYuMDAxNkgzLjU3NzA5QzMuODY4MDUgNi4wMDE2IDQuMTQ0NTggNS44NzQ4OCA0LjMzNDU1IDUuNjU0NDlMOC43NDI1NSAwLjU0MDUyQzkuMzQ3OCAtMC4xNjE2NjggMTAuNSAwLjI2NjM3NCAxMC41IDEuMTkzNDFWMTguOTY3MkMxMC41IDE5Ljg3NDUgOS4zODg5NCAyMC4zMTI5IDguNzY5NDIgMTkuNjVMNC4zMzE3OSAxNC45MDIxQzQuMTQyNjkgMTQuNjk5OCAzLjg3ODE2IDE0LjU4NDkgMy42MDEyMiAxNC41ODQ5SDEuNUMwLjY3MTU3MyAxNC41ODQ5IDAgMTMuOTEzNCAwIDEzLjA4NDlWNy41MDE2Wk01Ljg0OTQ1IDYuOTYwMjdDNS4yNzk1NiA3LjYyMTQzIDQuNDQ5OTcgOC4wMDE2IDMuNTc3MDkgOC4wMDE2SDJWMTIuNTg0OUgzLjYwMTIyQzQuNDMyMDMgMTIuNTg0OSA1LjIyNTY0IDEyLjkyOTUgNS43OTI5NSAxMy41MzY0TDguNSAxNi40MzI4VjMuODg1MjJMNS44NDk0NSA2Ljk2MDI3WiIgZmlsbD0iIzE2MTgyMyIgZmlsbC1vcGFjaXR5PSIwLjYiLz4KPHBhdGggZD0iTTEzLjUxNSA3LjE5MTE5QzEzLjM0MjQgNi45NzU1OSAxMy4zMzk5IDYuNjYwNTYgMTMuNTM1MiA2LjQ2NTNMMTQuMjQyMyA1Ljc1ODE5QzE0LjQzNzYgNS41NjI5MyAxNC43NTU4IDUuNTYxNzUgMTQuOTM1NiA1Ljc3MTM2QzE2Ljk5NTkgOC4xNzM2MiAxNi45OTU5IDExLjgyOCAxNC45MzU2IDE0LjIzMDNDMTQuNzU1OCAxNC40Mzk5IDE0LjQzNzYgMTQuNDM4NyAxNC4yNDIzIDE0LjI0MzVMMTMuNTM1MiAxMy41MzY0QzEzLjMzOTkgMTMuMzQxMSAxMy4zNDI0IDEzLjAyNjEgMTMuNTE1IDEyLjgxMDVDMTQuODEzIDExLjE4ODUgMTQuODEzIDguODEzMTIgMTMuNTE1IDcuMTkxMTlaIiBmaWxsPSIjMTYxODIzIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8cGF0aCBkPSJNMTYuNzE3MiAxNi43MTgzQzE2LjUyMTkgMTYuNTIzMSAxNi41MjMxIDE2LjIwNzQgMTYuNzA3MiAxNi4wMDE3QzE5LjcyNTcgMTIuNjMgMTkuNzI1NyA3LjM3MTY4IDE2LjcwNzIgNC4wMDAwMUMxNi41MjMxIDMuNzk0MjcgMTYuNTIxOSAzLjQ3ODU4IDE2LjcxNzIgMy4yODMzMkwxNy40MjQzIDIuNTc2MjFDMTcuNjE5NSAyLjM4MDk1IDE3LjkzNyAyLjM4MDIgMTguMTIzMyAyLjU4NDA4QzIxLjkwOTkgNi43MjkyNiAyMS45MDk5IDEzLjI3MjQgMTguMTIzMyAxNy40MTc2QzE3LjkzNyAxNy42MjE1IDE3LjYxOTUgMTcuNjIwNyAxNy40MjQzIDE3LjQyNTVMMTYuNzE3MiAxNi43MTgzWiIgZmlsbD0iIzE2MTgyMyIgZmlsbC1vcGFjaXR5PSIwLjYiLz4KPC9zdmc+Cg=="]'
+                    )
+                    if stealth == True:
+                        time.sleep(1)
+                    page.click(
+                        'img[src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjEiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMSAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTAgNy41MDE2QzAgNi42NzMxNyAwLjY3MTU3MyA2LjAwMTYgMS41IDYuMDAxNkgzLjU3NzA5QzMuODY4MDUgNi4wMDE2IDQuMTQ0NTggNS44NzQ4OCA0LjMzNDU1IDUuNjU0NDlMOC43NDI1NSAwLjU0MDUyQzkuMzQ3OCAtMC4xNjE2NjggMTAuNSAwLjI2NjM3NCAxMC41IDEuMTkzNDFWMTguOTY3MkMxMC41IDE5Ljg3NDUgOS4zODg5NCAyMC4zMTI5IDguNzY5NDIgMTkuNjVMNC4zMzE3OSAxNC45MDIxQzQuMTQyNjkgMTQuNjk5OCAzLjg3ODE2IDE0LjU4NDkgMy42MDEyMiAxNC41ODQ5SDEuNUMwLjY3MTU3MyAxNC41ODQ5IDAgMTMuOTEzNCAwIDEzLjA4NDlWNy41MDE2Wk01Ljg0OTQ1IDYuOTYwMjdDNS4yNzk1NiA3LjYyMTQzIDQuNDQ5OTcgOC4wMDE2IDMuNTc3MDkgOC4wMDE2SDJWMTIuNTg0OUgzLjYwMTIyQzQuNDMyMDMgMTIuNTg0OSA1LjIyNTY0IDEyLjkyOTUgNS43OTI5NSAxMy41MzY0TDguNSAxNi40MzI4VjMuODg1MjJMNS44NDk0NSA2Ljk2MDI3WiIgZmlsbD0iIzE2MTgyMyIgZmlsbC1vcGFjaXR5PSIwLjYiLz4KPHBhdGggZD0iTTEzLjUxNSA3LjE5MTE5QzEzLjM0MjQgNi45NzU1OSAxMy4zMzk5IDYuNjYwNTYgMTMuNTM1MiA2LjQ2NTNMMTQuMjQyMyA1Ljc1ODE5QzE0LjQzNzYgNS41NjI5MyAxNC43NTU4IDUuNTYxNzUgMTQuOTM1NiA1Ljc3MTM2QzE2Ljk5NTkgOC4xNzM2MiAxNi45OTU5IDExLjgyOCAxNC45MzU2IDE0LjIzMDNDMTQuNzU1OCAxNC40Mzk5IDE0LjQzNzYgMTQuNDM4NyAxNC4yNDIzIDE0LjI0MzVMMTMuNTM1MiAxMy41MzY0QzEzLjMzOTkgMTMuMzQxMSAxMy4zNDI0IDEzLjAyNjEgMTMuNTE1IDEyLjgxMDVDMTQuODEzIDExLjE4ODUgMTQuODEzIDguODEzMTIgMTMuNTE1IDcuMTkxMTlaIiBmaWxsPSIjMTYxODIzIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8cGF0aCBkPSJNMTYuNzE3MiAxNi43MTgzQzE2LjUyMTkgMTYuNTIzMSAxNi41MjMxIDE2LjIwNzQgMTYuNzA3MiAxNi4wMDE3QzE5LjcyNTcgMTIuNjMgMTkuNzI1NyA3LjM3MTY4IDE2LjcwNzIgNC4wMDAwMUMxNi41MjMxIDMuNzk0MjcgMTYuNTIxOSAzLjQ3ODU4IDE2LjcxNzIgMy4yODMzMkwxNy40MjQzIDIuNTc2MjFDMTcuNjE5NSAyLjM4MDk1IDE3LjkzNyAyLjM4MDIgMTguMTIzMyAyLjU4NDA4QzIxLjkwOTkgNi43MjkyNiAyMS45MDk5IDEzLjI3MjQgMTguMTIzMyAxNy40MTc2QzE3LjkzNyAxNy42MjE1IDE3LjYxOTUgMTcuNjIwNyAxNy40MjQzIDE3LjQyNTVMMTYuNzE3MiAxNi43MTgzWiIgZmlsbD0iIzE2MTgyMyIgZmlsbC1vcGFjaXR5PSIwLjYiLz4KPC9zdmc+Cg=="]'
+                    )
+                    time.sleep(0.5)
+                    sliders = page.locator("input.scaleInput")
+
+                    if sound_aud_vol == "background":
+                        slider1 = sliders.nth(0)
+                        bounding_box1 = slider1.bounding_box()
+                        if bounding_box1:
+                            x1 = bounding_box1["x"] + (bounding_box1["width"] * 0.92)
+                            y1 = bounding_box1["y"] + bounding_box1["height"] / 2
+                            if stealth == True:
+                                time.sleep(1)
+                            page.mouse.click(x1, y1)
+
+                        slider2 = sliders.nth(1)
+                        bounding_box2 = slider2.bounding_box()
+                        if bounding_box2:
+                            x2 = bounding_box2["x"] + (bounding_box2["width"] * 0.097)
+                            y2 = bounding_box2["y"] + bounding_box2["height"] / 2
+                            if stealth == True:
+                                time.sleep(1)
+                            page.mouse.click(x2, y2)
+
+                    if sound_aud_vol == "main":
+                        slider1 = sliders.nth(0)
+                        bounding_box1 = slider1.bounding_box()
+                        if bounding_box1:
+                            x1 = bounding_box1["x"] + (bounding_box1["width"] * 0.092)
+                            y1 = bounding_box1["y"] + bounding_box1["height"] / 2
+                            if stealth == True:
+                                time.sleep(1)
+                            page.mouse.click(x1, y1)
+                        slider2 = sliders.nth(1)
+                        bounding_box2 = slider2.bounding_box()
+                        if bounding_box2:
+                            x2 = bounding_box2["x"] + (bounding_box2["width"] * 0.92)
+                            y2 = bounding_box2["y"] + bounding_box2["height"] / 2
+                            if stealth == True:
+                                time.sleep(1)
+                            page.mouse.click(x2, y2)
+                except:
+                    sys.exit("ERROR ADJUSTING SOUND VOLUME: please try again.")
+
+                page.wait_for_selector("div.TUXButton-label:has-text('Save edit')")
+                if stealth == True:
+                    time.sleep(1)
+                page.click("div.TUXButton-label:has-text('Save edit')")
+                if suppressprint == False:
+                    print("Added sound")
+            except Exception as e:
+                logger.warning(f"Failed to select favorite sound '{favorite_sound_name}': {e}")
+                sound_fail = True
+        elif sound_name is not None:
+            try:
+                if stealth:
+                    time.sleep(2)
+                page.click("div.TUXButton-label:has-text('Edit video')")
+            except Exception:
                 sound_fail = True
             if sound_fail == False:
                 page.wait_for_selector("input.search-bar-input")
                 page.fill("input.search-bar-input", f"{sound_name}")
                 time.sleep(0.2)
-                if stealth == True:
+                if stealth:
                     time.sleep(2)
                 page.click("div.TUXButton-label:has-text('Search')")
                 try:
                     page.wait_for_selector("div.music-card-container")
-                    if stealth == True:
+                    if stealth:
                         time.sleep(0.5)
                     page.click("div.music-card-container")
                     page.wait_for_selector("div.TUXButton-label:has-text('Use')")
-                    if stealth == True:
+                    if stealth:
                         time.sleep(1)
                     page.click("div.TUXButton-label:has-text('Use')")
-                except:
+                except Exception:
                     sys.exit(f"ERROR: SOUND '{sound_name}' NOT FOUND")
                 try:
                     page.wait_for_selector(

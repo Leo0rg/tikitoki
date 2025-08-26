@@ -147,3 +147,5 @@ TikTokUploader/examples
 src/tiktokautouploader/Js_assets/node_modules/
 
 *.json
+
+test/*
