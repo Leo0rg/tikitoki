@@ -447,7 +447,7 @@ def upload_tiktok(
                 page.goto(url, timeout=30000)
             except Exception as e:
                 retries += 1
-                logger.warning("Failed to load TikTok upload page (Attempt %d): %s", retries, e)
+                logger.warning(f"Failed to load TikTok upload page (Attempt {retries}): {e}")
                 time.sleep(5)
                 if retries == 2:
                     sys.exit("ERROR: TIK TOK PAGE FAILED TO LOAD, try again.")
@@ -729,7 +729,7 @@ def upload_tiktok(
             ]:
                 try:
                     banner = page.locator(banner_sel).first
-                    if banner and banner.is_visible(timeout=500):
+                    if banner.is_visible(timeout=500):
                         for btn_text in [
                             "Allow all",
                             "Accept all",
