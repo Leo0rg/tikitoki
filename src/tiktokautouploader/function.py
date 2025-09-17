@@ -1,4 +1,5 @@
 import base64
+import difflib
 import json
 import os
 import subprocess
@@ -6,7 +7,6 @@ import sys
 import time
 import warnings
 
-import difflib
 import pkg_resources
 import requests
 from inference_sdk import InferenceHTTPClient

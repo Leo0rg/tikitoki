@@ -8,6 +8,7 @@ import boto3
 from faststream.rabbit import RabbitBroker
 from loguru import logger
 from pydantic import BaseModel, Field
+
 from src.loader import config
 from src.tiktokautouploader.function import login_only, upload_tiktok
 
