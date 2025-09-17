@@ -1275,7 +1275,7 @@ def upload_tiktok(
                     print("Checking for 'Turn on automatic content checks?' modal...")
 
                 modal = page.locator('[role="dialog"]')
-                modal.wait_for(timeout=5000)
+                modal.wait_for(timeout=30)
 
                 if modal.is_visible():
                     cancel_button = modal.get_by_role(
