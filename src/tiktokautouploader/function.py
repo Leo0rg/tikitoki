@@ -18,9 +18,7 @@ warnings.simplefilter("ignore")
 
 
 def check_for_updates():
-    current_version = (
-        "4.5"  
-    )
+    current_version = "4.5"
     response = requests.get("https://pypi.org/pypi/tiktokautouploader/json")
 
     if response.status_code == 200:
@@ -231,7 +229,7 @@ def solve_captcha_with_api(image_path):
     # except subprocess.CalledProcessError as e:
     #     raise Exception(f"Error running captcha solver script: {e.stderr}")
     # except Exception as e:
-        # raise Exception(f"An error occurred: {e}")
+    # raise Exception(f"An error occurred: {e}")
 
 
 def convert_to_webpage_coordinates(
@@ -447,7 +445,9 @@ def upload_tiktok(
                 page.goto(url, timeout=30000)
             except Exception as e:
                 retries += 1
-                logger.warning(f"Failed to load TikTok upload page (Attempt {retries}): {e}")
+                logger.warning(
+                    f"Failed to load TikTok upload page (Attempt {retries}): {e}"
+                )
                 time.sleep(5)
                 if retries == 2:
                     sys.exit("ERROR: TIK TOK PAGE FAILED TO LOAD, try again.")
@@ -468,69 +468,71 @@ def upload_tiktok(
                 else:
                     time.sleep(0.1)
 
-        if captcha: 
-        #     image = get_image_src(page)
-        #     if image:
-        #         if suppressprint == False:
-        #             print("CAPTCHA DETECTED, Attempting to solve")
-        #         solved = False
-        #         attempts = 0
-        #         while not solved and attempts < 5:
-        #             attempts += 1
-        #             img_path = download_image(image)
+        if captcha:
+            #     image = get_image_src(page)
+            #     if image:
+            #         if suppressprint == False:
+            #             print("CAPTCHA DETECTED, Attempting to solve")
+            #         solved = False
+            #         attempts = 0
+            #         while not solved and attempts < 5:
+            #             attempts += 1
+            #             img_path = download_image(image)
 
-        #             try:
-        #                 # NEW: Call to the API to solve captcha
-        #                 solution = solve_captcha_with_api(img_path)
+            #             try:
+            #                 # NEW: Call to the API to solve captcha
+            #                 solution = solve_captcha_with_api(img_path)
 
-        #                 # This part needs to be adapted depending on the captcha type (icon, etc.)
-        #                 # For now, let's assume it's an icon captcha and we get coordinates.
-        #                 if solution and solution.get('coordinates'):
-        #                     # The rest of the logic to click on coordinates
-        #                     # This part needs to be carefully adapted based on API response
+            #                 # This part needs to be adapted depending on the captcha type (icon, etc.)
+            #                 # For now, let's assume it's an icon captcha and we get coordinates.
+            #                 if solution and solution.get('coordinates'):
+            #                     # The rest of the logic to click on coordinates
+            #                     # This part needs to be carefully adapted based on API response
 
-        #                     imageweb = page.locator('#captcha-verify-image')
-        #                     box = imageweb.bounding_box()
-        #                     image_x = box['x']
-        #                     image_y = box['y']
-        #                     image_height_web = box['height']
-        #                     image_width_web = box['width']
+            #                     imageweb = page.locator('#captcha-verify-image')
+            #                     box = imageweb.bounding_box()
+            #                     image_x = box['x']
+            #                     image_y = box['y']
+            #                     image_height_web = box['height']
+            #                     image_width_web = box['width']
 
-        #                     with Image.open(img_path) as img:
-        #                         image_width_real, image_height_real = img.size
+            #                     with Image.open(img_path) as img:
+            #                         image_width_real, image_height_real = img.size
 
-        #                     webpage_coords = convert_to_webpage_coordinates(solution['coordinates'], image_x, image_y, image_height_web, image_width_web, image_height_real, image_width_real)
+            #                     webpage_coords = convert_to_webpage_coordinates(solution['coordinates'], image_x, image_y, image_height_web, image_width_web, image_height_real, image_width_real)
 
-        #                     click_on_objects(page, webpage_coords)
+            #                     click_on_objects(page, webpage_coords)
 
-        #                     page.click("div.verify-captcha-submit-button")
-        #                     time.sleep(2)
+            #                     page.click("div.verify-captcha-submit-button")
+            #                     time.sleep(2)
 
-        #                     if page.locator("div.captcha_verify_message.captcha_verify_message-pass").is_visible():
-        #                         solved = True
-        #                         print("CAPTCHA SOLVED")
-        #                     else:
-        #                         page.click('span.secsdk_captcha_refresh--text') # Refresh captcha
-        #                 else:
-        #                     raise Exception("Solver did not return coordinates.")
+            #                     if page.locator("div.captcha_verify_message.captcha_verify_message-pass").is_visible():
+            #                         solved = True
+            #                         print("CAPTCHA SOLVED")
+            #                     else:
+            #                         page.click('span.secsdk_captcha_refresh--text') # Refresh captcha
+            #                 else:
+            #                     raise Exception("Solver did not return coordinates.")
 
-        #             except Exception as e:
-        #                 print(f"Attempt {attempts} failed: {e}")
-        #                 page.click('span.secsdk_captcha_refresh--text') # Refresh captcha
-        #                 time.sleep(2)
-        #                 image = get_image_src(page) # Get new captcha image
-        #             finally:
-        #                 if os.path.exists(img_path):
-        #                     os.remove(img_path)
+            #             except Exception as e:
+            #                 print(f"Attempt {attempts} failed: {e}")
+            #                 page.click('span.secsdk_captcha_refresh--text') # Refresh captcha
+            #                 time.sleep(2)
+            #                 image = get_image_src(page) # Get new captcha image
+            #             finally:
+            #                 if os.path.exists(img_path):
+            #                     os.remove(img_path)
 
-        #         if not solved:
-        #             sys.exit("FAILED TO SOLVE CAPTCHA AFTER MULTIPLE ATTEMPTS")
+            #         if not solved:
+            #             sys.exit("FAILED TO SOLVE CAPTCHA AFTER MULTIPLE ATTEMPTS")
             logger.debug("Captcha solver not ready yet:(")
 
         try:
-            page.set_input_files('input[type="file"][accept="video/*"]', f'{video}')
+            page.set_input_files('input[type="file"][accept="video/*"]', f"{video}")
         except:
-            sys.exit("ERROR: FAILED TO INPUT FILE. Possible Issues: Wifi too slow, file directory wrong, or check documentation to see if captcha is solvable")
+            sys.exit(
+                "ERROR: FAILED TO INPUT FILE. Possible Issues: Wifi too slow, file directory wrong, or check documentation to see if captcha is solvable"
+            )
         page.wait_for_selector('div[data-contents="true"]')
 
         try:
@@ -737,11 +739,15 @@ def upload_tiktok(
                             "Принять все",
                         ]:
                             try:
-                                banner.get_by_role("button", name=btn_text, exact=False).click(timeout=1000)
+                                banner.get_by_role(
+                                    "button", name=btn_text, exact=False
+                                ).click(timeout=1000)
                                 break
                             except Exception:
                                 try:
-                                    banner.locator(f"button:has-text('{btn_text}')").click(timeout=1000)
+                                    banner.locator(
+                                        f"button:has-text('{btn_text}')"
+                                    ).click(timeout=1000)
                                     break
                                 except Exception:
                                     continue
@@ -777,34 +783,49 @@ def upload_tiktok(
                     try:
                         page.locator(sel).first.click(timeout=1500)
                         switched = True
-                        logger.debug(f"Successfully switched to Favorites tab using selector: {sel}")
+                        logger.debug(
+                            f"Successfully switched to Favorites tab using selector: {sel}"
+                        )
                         break
                     except Exception:
                         logger.debug(f"Failed to switch using selector: {sel}")
                         continue
                 if not switched:
-                    logger.debug("Favorites tab not found; skipping favorites selection")
+                    logger.debug(
+                        "Favorites tab not found; skipping favorites selection"
+                    )
                     raise Exception("Favorites tab not available")
 
                 logger.debug("Waiting for favorites list to load")
                 try:
-                    page.wait_for_selector('.collection-music-list .list-wrapper .list-container', timeout=4000)
+                    page.wait_for_selector(
+                        ".collection-music-list .list-wrapper .list-container",
+                        timeout=4000,
+                    )
                     logger.debug("Found deep container selector for favorites")
                 except Exception:
                     logger.debug("Falling back to music-card-container selector")
-                    page.wait_for_selector('.music-card-container', timeout=6000)
+                    page.wait_for_selector(".music-card-container", timeout=6000)
 
-                titles = [t.strip() for t in page.locator('.music-card-title').all_text_contents()]
+                titles = [
+                    t.strip()
+                    for t in page.locator(".music-card-title").all_text_contents()
+                ]
                 if not titles:
                     logger.warning("Favorites list appears empty")
                     raise Exception("Favorites list appears empty")
 
                 target = favorite_sound_name.strip()
-                scores = [difflib.SequenceMatcher(None, t.lower(), target.lower()).ratio() for t in titles]
+                scores = [
+                    difflib.SequenceMatcher(None, t.lower(), target.lower()).ratio()
+                    for t in titles
+                ]
                 best_idx, best_score = max(enumerate(scores), key=lambda x: x[1])
-                logger.info(f"Found best matching favorite: '{titles[best_idx]}' (score={best_score:.2f}) for target '{target}'")
+                logger.info(
+                    f"Found best matching favorite: '{titles[best_idx]}' (score={best_score:.2f}) for target '{target}'"
+                )
 
-                page.locator('.music-card-container').nth(best_idx).click()
+                page.locator(".music-card-container").nth(best_idx).click()
                 logger.debug("Clicked best matching favorite sound")
                 page.wait_for_selector("div.TUXButton-label:has-text('Use')")
                 if stealth:
@@ -868,7 +889,9 @@ def upload_tiktok(
                 if suppressprint == False:
                     print("Added sound")
             except Exception as e:
-                logger.warning(f"Failed to select favorite sound '{favorite_sound_name}': {e}")
+                logger.warning(
+                    f"Failed to select favorite sound '{favorite_sound_name}': {e}"
+                )
                 sound_fail = True
         elif sound_name is not None:
             try:
@@ -1290,7 +1313,7 @@ def upload_tiktok(
                         if stealth == True:
                             time.sleep(1)
                         cancel_button.click()
-                        time.sleep(2) 
+                        time.sleep(2)
             except Exception:
                 if suppressprint == False:
                     print(
@@ -1444,7 +1467,7 @@ def login_only(
             command,
             capture_output=True,
             text=True,
-            check=True, 
+            check=True,
             encoding="utf-8",
         )
         # process = subprocess.Popen(

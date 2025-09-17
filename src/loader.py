@@ -26,5 +26,5 @@ config.configure_rabbitmq(
 logger.add("logs/worker.log", rotation="500 MB")
 logger.info("Configuration loaded.")
 logger.info(f"RabbitMQ URL: {config.rabbitmq.url}")
-logger.info(f"S3 Endpoint: {config.s3.endpoint_url}") 
+logger.info(f"S3 Endpoint: {config.s3.endpoint_url}")
 logger.debug(f"S3 Bucket: {config.s3.bucket_name}")
