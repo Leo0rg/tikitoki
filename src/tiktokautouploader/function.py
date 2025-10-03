@@ -1036,6 +1036,35 @@ def upload_tiktok(
                 if schedule == None:
                     if stealth == True:
                         time.sleep(1)
+                    
+                    # Disable "Quick content check" toggle to prevent modal blocking
+                    try:
+                        if not suppressprint:
+                            print("Checking for 'Quick content check' toggle...")
+                        
+                        # Look for the quick content check switch
+                        content_check_switch = page.locator('div.Switch__root--checked-true input[role="switch"][type="checkbox"]')
+                        
+                        if content_check_switch.is_visible():
+                            if not suppressprint:
+                                print("Quick content check toggle found and enabled. Disabling it...")
+                            
+                            if stealth == True:
+                                time.sleep(0.5)
+                            
+                            content_check_switch.click()
+                            time.sleep(1)  # Wait for toggle to change state
+                            
+                            if not suppressprint:
+                                print("Quick content check toggle disabled successfully.")
+                        else:
+                            if not suppressprint:
+                                print("Quick content check toggle not found or already disabled.")
+                                
+                    except Exception as e:
+                        if not suppressprint:
+                            print(f"Could not interact with quick content check toggle: {str(e)}")
+                    
                     try:
                         page.click(
                             'button:has-text("Post")[data-e2e="post_video_button"]',
@@ -1324,6 +1353,35 @@ def upload_tiktok(
                 if schedule == None:
                     if stealth == True:
                         time.sleep(1)
+                                        
+                    # Disable "Quick content check" toggle to prevent modal blocking
+                    try:
+                        if not suppressprint:
+                            print("Checking for 'Quick content check' toggle...")
+                        
+                        # Look for the quick content check switch
+                        content_check_switch = page.locator('div.Switch__root--checked-true input[role="switch"][type="checkbox"]')
+                        
+                        if content_check_switch.is_visible():
+                            if not suppressprint:
+                                print("Quick content check toggle found and enabled. Disabling it...")
+                            
+                            if stealth == True:
+                                time.sleep(0.5)
+                            
+                            content_check_switch.click()
+                            time.sleep(1)  # Wait for toggle to change state
+                            
+                            if not suppressprint:
+                                print("Quick content check toggle disabled successfully.")
+                        else:
+                            if not suppressprint:
+                                print("Quick content check toggle not found or already disabled.")
+                                
+                    except Exception as e:
+                        if not suppressprint:
+                            print(f"Could not interact with quick content check toggle: {str(e)}")
+                    
                     try:
                         page.click(
                             'button:has-text("Post")[data-e2e="post_video_button"]',
